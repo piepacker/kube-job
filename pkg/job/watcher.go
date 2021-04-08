@@ -1,9 +1,10 @@
 package job
 
 import (
+	"bufio"
 	"context"
+	"fmt"
 	"io"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -28,8 +29,8 @@ type Watcher struct {
 // NewWatcher returns a new Watcher struct.
 func NewWatcher(client kubernetes.Interface, container string) *Watcher {
 	return &Watcher{
-		client,
-		container,
+		client: client,
+		Container: container,
 	}
 }
 
@@ -152,8 +153,17 @@ func readStreamLog(ctx context.Context, request *restclient.Request, pod corev1.
 		return err
 	}
 	defer readCloser.Close()
-	_, err = io.Copy(os.Stdout, readCloser)
-	return err
+	rd := bufio.NewReader(readCloser)
+	for {
+		str, err := rd.ReadString('\n')
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+		fmt.Printf("%s: %s\n", pod.Name, str)
+	}
 }
 
 // diffPods returns diff between the two pods list.
